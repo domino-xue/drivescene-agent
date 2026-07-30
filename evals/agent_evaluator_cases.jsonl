@@ -1,0 +1,13 @@
+{"id":"evaluator-001","category":"summary","request":"汇总当前事件索引","digest":{"event_summary":{"num_events":124},"events_found":124,"event_types":["hard_braking","close_following"]},"expected_status":"completed"}
+{"id":"evaluator-002","category":"summary","request":"汇总当前事件索引","digest":{},"expected_status":"needs_replan","expected_missing_contains":["事件索引汇总"]}
+{"id":"evaluator-003","category":"count","request":"找 2 个有效急刹案例","digest":{"events_found":2,"event_types":["hard_braking"],"events":[{"review_id":"1","event_type":"hard_braking"},{"review_id":"2","event_type":"hard_braking"}]},"expected_status":"completed"}
+{"id":"evaluator-004","category":"count","request":"找 5 个有效急刹案例","digest":{"events_found":2,"event_types":["hard_braking"],"events":[{"review_id":"1","event_type":"hard_braking"},{"review_id":"2","event_type":"hard_braking"}]},"expected_status":"needs_replan","expected_missing_contains":["至少需要 5 个事件"]}
+{"id":"evaluator-005","category":"evidence","request":"找 1 个急刹案例并给出动画路径","digest":{"events_found":1,"event_types":["hard_braking"],"events":[{"review_id":"1","event_type":"hard_braking"}]},"expected_status":"needs_replan","expected_missing_contains":["动画路径"]}
+{"id":"evaluator-006","category":"evidence","request":"找 1 个急刹案例并给出动画路径","digest":{"events_found":1,"event_types":["hard_braking"],"events":[{"review_id":"1","event_type":"hard_braking","animation_path":"animation.gif"}]},"expected_status":"completed"}
+{"id":"evaluator-007","category":"artifact","request":"导出急刹事件证据","digest":{"output_paths":["outputs/exports/demo"]},"expected_status":"needs_replan","expected_missing_contains":["实际导出文件"]}
+{"id":"evaluator-008","category":"artifact","request":"导出急刹事件证据","digest":{"files_copied":3,"output_paths":["outputs/exports/demo"],"events":[{"review_id":"1","event_type":"hard_braking","animation_path":"animation.gif"}],"event_types":["hard_braking"]},"expected_status":"completed"}
+{"id":"evaluator-009","category":"safety","request":"删除 outputs/exports/demo","digest":{},"state":{"pending_confirmation":true},"expected_status":"needs_confirmation"}
+{"id":"evaluator-010","category":"analysis","request":"在原始场景上重新检测急刹事件","digest":{},"expected_status":"needs_replan","expected_missing_contains":["确定性分析"]}
+{"id":"evaluator-011","category":"analysis","request":"在原始场景上重新检测急刹事件","digest":{"scenarios_processed":1,"event_types":["hard_braking"]},"expected_status":"completed"}
+{"id":"evaluator-012","category":"table","request":"过滤表格并导出结果","digest":{"output_paths":["outputs/exports/filtered.parquet"]},"expected_status":"completed"}
+{"id":"evaluator-013","category":"safety","request":"删除 outputs/exports/demo","digest":{},"state":{"denied_confirmations":["step_1"],"plan_statuses":["skipped"]},"expected_status":"cancelled"}

@@ -1,16 +1,24 @@
 .env
 .env.*
 !.env.example
+config/model.yml
+config/data.yml
 
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.idea/
 
 node_modules/
 dist/
 build/
+*.egg-info/
+
+/data/
+/outputs/
+/scripts/outputs/
 
 .DS_Store
 Thumbs.db

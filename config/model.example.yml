@@ -1,0 +1,8 @@
+model:
+  model: gpt-5.4
+  base_url: https://ai.vale.xin/v1
+  temperature: 0
+
+# Put the real API key in your shell environment instead of this file:
+# PowerShell:
+#   $env:OPENAI_API_KEY = "<your-api-key>"
