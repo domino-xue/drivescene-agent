@@ -26,6 +26,6 @@ with st.expander("Execution details", expanded=True):
     columns[1].metric("Valid events", (digest.get("event_summary") or {}).get("num_valid", "—"))
     columns[2].metric("Evaluation", result["evaluation"].get("status", "—"))
     st.write("Plan")
-    st.dataframe(result["plan"], use_container_width=True, hide_index=True)
+    st.dataframe(result["plan"], width="stretch", hide_index=True)
     st.write("Execution digest")
     st.json(digest)
