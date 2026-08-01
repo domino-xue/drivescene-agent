@@ -108,6 +108,18 @@ Run the Streamlit agent UI:
 The Streamlit UI consumes the same event stream and updates the plan/tool-result
 panel while steps are running.
 
+Run the minimal offline demo without an API key or the full Argoverse 2 data:
+
+```powershell
+& 'D:\app\envs\agent\python.exe' scripts\run_demo.py
+& 'D:\app\envs\agent\python.exe' -m streamlit run scripts\demo_app.py --server.headless true
+```
+
+![DriveScene Agent minimal demo](docs/assets/drivescene-demo.png)
+
+GitHub Actions runs Ruff, the full pytest suite, and the offline demo smoke test
+without requiring an API key or the full dataset.
+
 Model config:
 
 ```yaml

@@ -19,3 +19,5 @@ jobs:
         run: python -m ruff check src scripts tests
       - name: Test
         run: python -m pytest -q
+      - name: Offline demo smoke test
+        run: python scripts/run_demo.py --json > demo-result.json
