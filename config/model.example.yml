@@ -1,7 +1,10 @@
 model:
-  model: gpt-5.4
-  base_url: https://ai.vale.xin/v1
+  model: deepseek-v4-flash
+  base_url: https://api.deepseek.com
   temperature: 0
+  reasoning_effort: xhigh
+  store: false
+  use_responses_api: true
 
 # Put the real API key in your shell environment instead of this file:
 # PowerShell:

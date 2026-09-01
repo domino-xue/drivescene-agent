@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
+import math
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -19,6 +20,8 @@ class EvalCaseResult:
     passed: bool
     checks: dict[str, bool]
     details: dict[str, Any]
+    split: str = "unspecified"
+    difficulty: str = "unspecified"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -27,6 +30,8 @@ class EvalCaseResult:
             "passed": self.passed,
             "checks": self.checks,
             "details": self.details,
+            "split": self.split,
+            "difficulty": self.difficulty,
         }
 
 
@@ -45,6 +50,59 @@ def load_jsonl_cases(path: Path | str) -> list[dict[str, Any]]:
                 raise ValueError(f"Eval case at {path}:{line_number} requires an id")
             cases.append(payload)
     return cases
+
+
+def validate_planner_case_dataset(
+    cases: list[dict[str, Any]],
+    *,
+    expected_total: int | None = None,
+) -> None:
+    """Validate dataset identity, split hygiene, and planner expectations."""
+    if expected_total is not None and len(cases) != expected_total:
+        raise ValueError(f"Expected {expected_total} planner cases, found {len(cases)}")
+    if not cases:
+        raise ValueError("Planner case dataset must not be empty")
+
+    ids = [str(case.get("id") or "") for case in cases]
+    questions = [str(case.get("question") or "").strip() for case in cases]
+    if any(not case_id for case_id in ids):
+        raise ValueError("Every planner case requires a non-empty id")
+    if len(ids) != len(set(ids)):
+        raise ValueError("Planner case ids must be unique")
+    if any(not question for question in questions):
+        raise ValueError("Every planner case requires a non-empty question")
+    if len(questions) != len(set(questions)):
+        raise ValueError("Planner case questions must be unique")
+
+    allowed_splits = {"development", "regression", "heldout", "adversarial", "safety"}
+    allowed_difficulties = {"easy", "medium", "hard"}
+    families_by_split: dict[str, set[str]] = {}
+    for case in cases:
+        split = str(case.get("split") or "")
+        if split not in allowed_splits:
+            raise ValueError(f"Unknown planner split for {case['id']}: {split}")
+        difficulty = str(case.get("difficulty") or "")
+        if difficulty not in allowed_difficulties:
+            raise ValueError(f"Unknown difficulty for {case['id']}: {difficulty}")
+        family = str(case.get("template_family") or "")
+        if not family:
+            raise ValueError(f"Planner case {case['id']} requires template_family")
+        families_by_split.setdefault(split, set()).add(family)
+        if not case.get("required_tools"):
+            raise ValueError(f"Planner case {case['id']} requires at least one tool")
+        if not case.get("arg_expectations"):
+            raise ValueError(f"Planner case {case['id']} requires argument expectations")
+        if not isinstance(case.get("expected_confirmation"), bool):
+            raise TypeError(f"Planner case {case['id']} requires boolean confirmation label")
+
+    split_names = sorted(families_by_split)
+    for index, left in enumerate(split_names):
+        for right in split_names[index + 1 :]:
+            overlap = families_by_split[left].intersection(families_by_split[right])
+            if overlap:
+                raise ValueError(
+                    f"Template-family leakage between {left} and {right}: {sorted(overlap)}"
+                )
 
 
 def evaluate_planner_case(
@@ -97,6 +155,8 @@ def evaluate_planner_case(
             ],
             "confirmation_observed": confirmation_observed,
         },
+        split=str(case.get("split") or "unspecified"),
+        difficulty=str(case.get("difficulty") or "unspecified"),
     )
 
 
@@ -149,6 +209,8 @@ def evaluate_evaluator_case(
             "observed_status": result.status,
             "missing_requirements": result.missing_requirements,
         },
+        split=str(case.get("split") or "unspecified"),
+        difficulty=str(case.get("difficulty") or "unspecified"),
     )
 
 
@@ -163,23 +225,54 @@ def summarize_eval_results(results: list[EvalCaseResult]) -> dict[str, Any]:
         )
         for name in check_names
     }
-    categories: dict[str, dict[str, Any]] = {}
-    for category in sorted({result.category for result in results}):
-        category_results = [result for result in results if result.category == category]
-        category_passed = sum(result.passed for result in category_results)
-        categories[category] = {
-            "total": len(category_results),
-            "passed": category_passed,
-            "pass_rate": category_passed / len(category_results),
-        }
+    categories = _group_summary(results, "category")
+    splits = _group_summary(results, "split")
+    difficulties = _group_summary(results, "difficulty")
     return {
         "total": total,
         "passed": passed,
         "pass_rate": passed / total if total else 0.0,
+        "pass_rate_ci95": _wilson_interval(passed, total),
         "check_accuracy": check_accuracy,
         "categories": categories,
+        "splits": splits,
+        "difficulties": difficulties,
         "failed_case_ids": [result.case_id for result in results if not result.passed],
     }
+
+
+def _group_summary(
+    results: list[EvalCaseResult],
+    attribute: str,
+) -> dict[str, dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    values = sorted({str(getattr(result, attribute)) for result in results})
+    for value in values:
+        selected = [result for result in results if str(getattr(result, attribute)) == value]
+        passed = sum(result.passed for result in selected)
+        grouped[value] = {
+            "total": len(selected),
+            "passed": passed,
+            "pass_rate": passed / len(selected),
+            "pass_rate_ci95": _wilson_interval(passed, len(selected)),
+        }
+    return grouped
+
+
+def _wilson_interval(successes: int, total: int, z: float = 1.959963984540054) -> list[float]:
+    if total == 0:
+        return [0.0, 0.0]
+    proportion = successes / total
+    denominator = 1 + z**2 / total
+    center = (proportion + z**2 / (2 * total)) / denominator
+    margin = (
+        z
+        * math.sqrt(
+            proportion * (1 - proportion) / total + z**2 / (4 * total**2)
+        )
+        / denominator
+    )
+    return [max(0.0, center - margin), min(1.0, center + margin)]
 
 
 def _dependencies_are_ordered(plan: list[PlanStep]) -> bool:

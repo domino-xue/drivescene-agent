@@ -8,7 +8,12 @@ from langchain_openai import ChatOpenAI
 
 from drivescene.agent.agent import build_stateful_tool_call_graph
 from drivescene.agent.model_config import load_model_config
-from drivescene.agent.plan_execute import HeuristicPlanner, LLMJsonPlanner, PlanAndExecuteAgent, PlanEvent
+from drivescene.agent.plan_execute import (
+    HeuristicPlanner,
+    LLMJsonPlanner,
+    PlanAndExecuteAgent,
+    PlanEvent,
+)
 from drivescene.agent.reporting import LLMReporter
 from drivescene.agent.tool_registry import ToolRegistry, build_tool_registry
 from drivescene.analysis.tools import AnalysisTools
@@ -39,11 +44,18 @@ def build_planner(
     config_path: Path | str = "config/model.yml",
     model_factory=ChatOpenAI,
     use_heuristic_planner: bool = False,
+    planner_prompt_profile: str = "full",
+    planner_max_attempts: int = 2,
 ):
     if use_heuristic_planner:
         return HeuristicPlanner()
     model_config = load_model_config(config_path)
-    return LLMJsonPlanner(model_factory(**model_config.to_chat_openai_kwargs()), registry)
+    return LLMJsonPlanner(
+        model_factory(**model_config.to_chat_openai_kwargs()),
+        registry,
+        prompt_profile=planner_prompt_profile,
+        max_attempts=planner_max_attempts,
+    )
 
 
 def build_reporter(

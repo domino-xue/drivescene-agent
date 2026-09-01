@@ -1,0 +1,111 @@
+{
+  "status": "validated_single_run",
+  "created_at": "2026-08-30",
+  "source_result": "outputs/planner_ablation_results_deepseek_v4_flash.json",
+  "git_commit": "7e57787943cbd5db6a2400d2bd4673480491f5f7",
+  "dataset": {
+    "path": "evals/agent_planner_cases_200.jsonl",
+    "sha256": "9629d1c02fd189452fcff0dd3690a887653fd4aa729d3a480cdcf41d875ac1d5",
+    "total_cases": 200,
+    "evaluated_cases": 120,
+    "splits": {
+      "heldout": 60,
+      "adversarial": 40,
+      "safety": 20
+    }
+  },
+  "model": {
+    "name": "deepseek-v4-flash",
+    "temperature": 0,
+    "reasoning_effort_requested": "xhigh",
+    "reasoning_effort_provider_mapping": "high"
+  },
+  "metric": "whole-case pass: step count, known tools, ordered dependencies, required and forbidden tools, argument subsets, and confirmation behavior must all pass",
+  "variants": {
+    "full": {
+      "passed": 104,
+      "total": 120,
+      "pass_rate": 0.8666666667,
+      "wilson_ci95": [0.7943520343, 0.9162339104]
+    },
+    "no_retry": {
+      "passed": 102,
+      "total": 120,
+      "pass_rate": 0.85,
+      "wilson_ci95": [0.7753247064, 0.9029618771]
+    },
+    "schema_only": {
+      "passed": 26,
+      "total": 120,
+      "pass_rate": 0.2166666667,
+      "wilson_ci95": [0.1523672356, 0.2985436253]
+    },
+    "names_only": {
+      "passed": 0,
+      "total": 120,
+      "pass_rate": 0,
+      "wilson_ci95": [0, 0.0310191664]
+    },
+    "heuristic": {
+      "passed": 9,
+      "total": 120,
+      "pass_rate": 0.075,
+      "wilson_ci95": [0.0399571154, 0.1364091761]
+    }
+  },
+  "paired_comparisons_to_full": {
+    "no_retry": {
+      "delta_percentage_points": 1.6666666667,
+      "full_only_passes": 4,
+      "other_only_passes": 2,
+      "exact_mcnemar_p": 0.6875,
+      "interpretation": "not statistically distinguishable in this run"
+    },
+    "schema_only": {
+      "delta_percentage_points": 65,
+      "full_only_passes": 78,
+      "other_only_passes": 0,
+      "exact_mcnemar_p": 6.6174449004e-24
+    },
+    "names_only": {
+      "delta_percentage_points": 86.6666666667,
+      "full_only_passes": 104,
+      "other_only_passes": 0,
+      "exact_mcnemar_p": 9.8607613153e-32
+    },
+    "heuristic": {
+      "delta_percentage_points": 79.1666666667,
+      "full_only_passes": 95,
+      "other_only_passes": 0,
+      "exact_mcnemar_p": 5.0487097934e-29
+    }
+  },
+  "full_breakdown": {
+    "splits": {
+      "heldout": {"passed": 50, "total": 60, "pass_rate": 0.8333333333},
+      "adversarial": {"passed": 37, "total": 40, "pass_rate": 0.925},
+      "safety": {"passed": 17, "total": 20, "pass_rate": 0.85}
+    },
+    "categories": {
+      "analysis": {"passed": 20, "total": 20, "pass_rate": 1},
+      "artifact": {"passed": 15, "total": 17, "pass_rate": 0.8823529412},
+      "evidence": {"passed": 11, "total": 11, "pass_rate": 1},
+      "retrieval": {"passed": 25, "total": 28, "pass_rate": 0.8928571429},
+      "safety": {"passed": 27, "total": 31, "pass_rate": 0.8709677419},
+      "table": {"passed": 6, "total": 13, "pass_rate": 0.4615384615}
+    },
+    "failed_check_counts": {
+      "arguments": 15,
+      "required_tools": 3,
+      "confirmation": 3,
+      "step_count": 1
+    },
+    "planner_execution_errors": 0
+  },
+  "limitations": [
+    "This is a finite, programmatically generated contract benchmark, not an open-domain user study.",
+    "This artifact records one model run; temperature 0 does not guarantee deterministic provider output.",
+    "Development and regression cases are excluded from the headline result.",
+    "Targeted runtime-module ablations use constructed failure-mode cases and must be reported separately."
+  ]
+}

@@ -1,19 +1,22 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from fnmatch import fnmatch
 import json
-from pathlib import Path
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from fnmatch import fnmatch
+from pathlib import Path
 from typing import Any, Protocol
 
 from drivescene.agent.digest import ExecutionDigestBuilder
 from drivescene.agent.evaluator import SimpleEvaluator
 from drivescene.agent.reporting import LLMReporter
-from drivescene.agent.tool_registry import ToolRegistry, execute_registered_tool, preflight_tool_call
+from drivescene.agent.tool_registry import (
+    ToolRegistry,
+    execute_registered_tool,
+    preflight_tool_call,
+)
 from drivescene.ops.contracts import validation_error_result
-
 
 StepStatus = str
 
@@ -215,18 +218,28 @@ class LLMJsonPlanner:
         *,
         max_attempts: int = 2,
         max_steps: int = 12,
+        prompt_profile: str = "full",
     ) -> None:
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
         if max_steps < 1:
             raise ValueError("max_steps must be at least 1")
+        if prompt_profile not in {"full", "schema_only", "names_only"}:
+            raise ValueError(
+                "prompt_profile must be one of: full, schema_only, names_only"
+            )
         self.model = model
         self.registry = registry
         self.max_attempts = max_attempts
         self.max_steps = max_steps
+        self.prompt_profile = prompt_profile
 
     def create_plan(self, user_request: str) -> list[PlanStep]:
-        base_prompt = _planner_prompt(user_request, self.registry)
+        base_prompt = _planner_prompt(
+            user_request,
+            self.registry,
+            prompt_profile=self.prompt_profile,
+        )
         allowed_external_dependencies = _existing_step_ids_from_replan_request(user_request)
         errors: list[str] = []
         for attempt in range(1, self.max_attempts + 1):
@@ -1673,8 +1686,13 @@ def _parse_planner_payload(content: Any) -> Any:
     if isinstance(content, Mapping):
         return dict(content)
     if isinstance(content, list):
-        if content and all(isinstance(block, Mapping) and "text" in block for block in content):
-            content = "".join(str(block["text"]) for block in content)
+        text_blocks = [
+            str(block["text"])
+            for block in content
+            if isinstance(block, Mapping) and isinstance(block.get("text"), str)
+        ]
+        if text_blocks:
+            content = "".join(text_blocks)
         else:
             return content
     if isinstance(content, bytes):
@@ -1798,25 +1816,66 @@ def _planner_retry_prompt(base_prompt: str, error: str, attempt: int) -> str:
     )
 
 
-def _planner_prompt(user_request: str, registry: ToolRegistry) -> str:
+def _planner_prompt(
+    user_request: str,
+    registry: ToolRegistry,
+    *,
+    prompt_profile: str = "full",
+) -> str:
     tool_lines = []
     for name, spec in registry.items():
-        tool_lines.append(
-            "\n".join(
+        if prompt_profile == "names_only":
+            tool_lines.append(f"- {name}")
+            continue
+        compact_lines = [
+            f"- tool_name: {name}",
+            f"  category: {spec.category}",
+            f"  purpose: {spec.purpose}",
+            f"  args_schema: {spec.args_schema}",
+        ]
+        if prompt_profile == "full":
+            compact_lines.extend(
                 [
-                    f"- tool_name: {name}",
-                    f"  category: {spec.category}",
-                    f"  purpose: {spec.purpose}",
                     f"  input: {spec.input_contract}",
                     f"  output: {spec.output_contract}",
                     f"  when_to_use: {spec.when_to_use}",
                     f"  do_not_use_when: {spec.do_not_use_when}",
                     f"  zh_note: {spec.zh_note}",
-                    f"  args_schema: {spec.args_schema}",
                     f"  examples: {spec.examples}",
                 ]
             )
+        tool_lines.append("\n".join(compact_lines))
+
+    strict_rules = ""
+    state_rules = ""
+    if prompt_profile == "full":
+        strict_rules = (
+            "Strict argument rules: use EvidenceStore operation='summary' for counts/statistics "
+            "and operation='search' for event rows. Scenario filters are exactly city, object_type, "
+            "and has_map; normalize city values to lowercase. For strongest hard braking sort by "
+            "min_velocity_acceleration_mps2 ascending=true. For closest following sort by "
+            "min_front_distance_m ascending=true. Analysis windows use the exact keys "
+            "start_timestep and end_timestep. Preserve user-provided ids and paths verbatim. "
+            "Do not set overwrite=true unless the user explicitly requests overwrite or an in-place "
+            "table modification.\n"
         )
+        state_rules = (
+            "Never use string placeholders such as '$', '${step_1}', or 'previous_result'. "
+            "To pass a previous step output into a later tool, use a structured reference object: "
+            "{\"$from_step\":\"step_1\",\"$select\":\"output.items[*].result.review_id\"}. "
+            "Prefer typed state references for common handoffs: "
+            "{\"$from_state\":\"review_ids\"} for event ids and "
+            "{\"$from_state\":\"evidence_paths\"} for files to copy, and the latest "
+            "export folder from typed state instead of selecting items[0] from create_folder. "
+            "Do not use selectors like items[0] directly against a step envelope; use "
+            "output.items[0].result only for rare low-level reads, or typed state top_event "
+            "when you mean the top ranked event. "
+            "For copying event evidence, first search events, then query evidence, then call "
+            "ArtifactOps.manage_artifacts(operation='copy') with paths from typed state or omit "
+            "paths so the executor can bind evidence_paths. "
+            "The executor resolves references and binds typed state before validating and calling tools.\n"
+        )
+
     return (
         "You are the Planner for an autonomous-driving scenario mining agent.\n"
         "Return JSON only. Do not output Markdown.\n"
@@ -1825,32 +1884,12 @@ def _planner_prompt(user_request: str, registry: ToolRegistry) -> str:
         "\"depends_on\":[],\"status\":\"pending\"}]}.\n"
         "Prefer generic parameterized tools. Use filters.event_type for hard_braking "
         "or close_following instead of inventing specialized tool names.\n"
-        "Strict argument rules: use EvidenceStore operation='summary' for counts/statistics "
-        "and operation='search' for event rows. Scenario filters are exactly city, object_type, "
-        "and has_map; normalize city values to lowercase. For strongest hard braking sort by "
-        "min_velocity_acceleration_mps2 ascending=true. For closest following sort by "
-        "min_front_distance_m ascending=true. Analysis windows use the exact keys "
-        "start_timestep and end_timestep. Preserve user-provided ids and paths verbatim. "
-        "Do not set overwrite=true unless the user explicitly requests overwrite or an in-place "
-        "table modification.\n"
-        "Never use string placeholders such as '$', '${step_1}', or 'previous_result'. "
-        "To pass a previous step output into a later tool, use a structured reference object: "
-        "{\"$from_step\":\"step_1\",\"$select\":\"output.items[*].result.review_id\"}. "
-        "Prefer typed state references for common handoffs: "
-        "{\"$from_state\":\"review_ids\"} for event ids and "
-        "{\"$from_state\":\"evidence_paths\"} for files to copy, and the latest "
-        "export folder from typed state instead of selecting items[0] from create_folder. "
-        "Do not use selectors like items[0] directly against a step envelope; use "
-        "output.items[0].result only for rare low-level reads, or typed state top_event "
-        "when you mean the top ranked event. "
-        "For copying event evidence, first search events, then query evidence, then call "
-        "ArtifactOps.manage_artifacts(operation='copy') with paths from typed state or omit "
-        "paths so the executor can bind evidence_paths. "
-        "The executor resolves references and binds typed state before validating and calling tools.\n"
-        "All tool outputs are state-transform envelopes with ok, operation, summary, and items. "
-        "Each item has input, ok, result, error, and optional error_type.\n"
-        f"User request: {user_request}\n"
-        "Available tools:\n"
+        + strict_rules
+        + state_rules
+        + "All tool outputs are state-transform envelopes with ok, operation, summary, and items. "
+        + "Each item has input, ok, result, error, and optional error_type.\n"
+        + f"User request: {user_request}\n"
+        + "Available tools:\n"
         + "\n".join(tool_lines)
     )
 

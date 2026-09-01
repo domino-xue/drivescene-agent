@@ -68,6 +68,19 @@ def test_planner_accepts_json_fence_and_validates_plan() -> None:
     assert plan[0].tool_name == "EvidenceStore.query_index"
 
 
+def test_planner_ignores_responses_api_reasoning_blocks() -> None:
+    content = [
+        {"type": "reasoning", "reasoning": "hidden summary"},
+        {"type": "text", "text": _valid_payload()},
+    ]
+    planner = LLMJsonPlanner(SequenceModel([content]), _registry(), max_attempts=1)
+
+    plan = planner.create_plan("汇总事件")
+
+    assert [step.step_id for step in plan] == ["step_1"]
+    assert plan[0].tool_name == "EvidenceStore.query_index"
+
+
 def test_planner_retries_after_schema_validation_error() -> None:
     invalid = _valid_payload().replace("EvidenceStore.query_index", "Unknown.tool")
     model = SequenceModel([invalid, _valid_payload()])
@@ -112,3 +125,29 @@ def test_replan_may_depend_on_completed_external_step() -> None:
     plan = planner.create_plan(request)
 
     assert plan[0].depends_on == ["step_1"]
+
+
+def test_planner_prompt_profiles_remove_contract_layers_for_ablation() -> None:
+    full_model = SequenceModel([_valid_payload()])
+    schema_model = SequenceModel([_valid_payload()])
+    names_model = SequenceModel([_valid_payload()])
+
+    LLMJsonPlanner(full_model, _registry(), prompt_profile="full").create_plan("汇总事件")
+    LLMJsonPlanner(schema_model, _registry(), prompt_profile="schema_only").create_plan(
+        "汇总事件"
+    )
+    LLMJsonPlanner(names_model, _registry(), prompt_profile="names_only").create_plan(
+        "汇总事件"
+    )
+
+    assert "Strict argument rules" in full_model.prompts[0]
+    assert "examples:" in full_model.prompts[0]
+    assert "Strict argument rules" not in schema_model.prompts[0]
+    assert "args_schema:" in schema_model.prompts[0]
+    assert "args_schema:" not in names_model.prompts[0]
+    assert "EvidenceStore.query_index" in names_model.prompts[0]
+
+
+def test_planner_rejects_unknown_prompt_profile() -> None:
+    with pytest.raises(ValueError, match="prompt_profile"):
+        LLMJsonPlanner(SequenceModel([_valid_payload()]), _registry(), prompt_profile="unknown")

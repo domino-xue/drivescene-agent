@@ -1,0 +1,34 @@
+{
+  "dataset": "agent_planner_cases_200.jsonl",
+  "version": "1.0.0",
+  "total": 200,
+  "sha256": "9629d1c02fd189452fcff0dd3690a887653fd4aa729d3a480cdcf41d875ac1d5",
+  "splits": {
+    "adversarial": 40,
+    "development": 40,
+    "heldout": 60,
+    "regression": 40,
+    "safety": 20
+  },
+  "categories": {
+    "analysis": 36,
+    "artifact": 30,
+    "evidence": 20,
+    "retrieval": 50,
+    "safety": 41,
+    "table": 23
+  },
+  "difficulties": {
+    "easy": 40,
+    "hard": 81,
+    "medium": 79
+  },
+  "unique_questions": 200,
+  "template_family_policy": "Template-family identifiers are split-scoped; development and regression are not included in the primary heldout/adversarial/safety score.",
+  "primary_evaluation_splits": [
+    "heldout",
+    "adversarial",
+    "safety"
+  ],
+  "generator": "scripts/build_planner_eval_dataset.py"
+}

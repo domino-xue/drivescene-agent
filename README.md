@@ -73,18 +73,29 @@ Build and review scenario evidence:
 & 'D:\app\envs\agent\python.exe' scripts\compute_review_metrics.py
 ```
 
-Run the offline Agent evaluations:
+Build the stratified 200-case planner benchmark and run the offline evaluations:
 
 ```powershell
+& 'D:\app\envs\agent\python.exe' scripts\build_planner_eval_dataset.py
 & 'D:\app\envs\agent\python.exe' scripts\evaluate_agent.py --suite evaluator
-& 'D:\app\envs\agent\python.exe' scripts\evaluate_agent.py --suite planner
+& 'D:\app\envs\agent\python.exe' scripts\evaluate_agent.py --suite planner --splits heldout,adversarial,safety
 & 'D:\app\envs\agent\python.exe' scripts\evaluate_agent.py --suite planner --use-heuristic-planner
+& 'D:\app\envs\agent\python.exe' scripts\run_runtime_ablation.py
 ```
 
-The planner suite contains 30 Chinese tasks covering retrieval, evidence,
-analysis, artifact, table, and safety planning. The deterministic evaluator
-suite contains 13 completion, cancellation, and replan cases. Results are written under
-`outputs/`.
+The primary planner suite contains 200 Chinese tasks stratified into development,
+regression, heldout, adversarial, and safety splits. The deterministic evaluator suite
+contains 13 completion, cancellation, and replan cases. Planner reports include category,
+split, difficulty, and 95% Wilson confidence intervals. Controlled prompt/tool-contract
+ablations are available through `scripts/run_planner_ablation.py`; deterministic Typed
+Blackboard, completion-evaluator, and risk-gate ablations are available through
+`scripts/run_runtime_ablation.py`. See `docs/agent_evaluation.md` for reporting rules.
+
+Validated on 2026-08-30 with DeepSeek V4 Flash, the complete planner passed 104/120
+heldout/adversarial/safety cases (86.7%, Wilson 95% CI 79.4%-91.6%), versus 9/120
+(7.5%) for the heuristic baseline. Reducing rich tool contracts to schemas only dropped
+the rate to 26/120 (21.7%). See `evals/planner_ablation_deepseek_v4_flash_summary.json`
+for the compact, caveated result.
 
 Run the Plan-and-Execute CLI:
 

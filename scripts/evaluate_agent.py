@@ -10,6 +10,7 @@ from drivescene.eval.agent_eval import (
     evaluate_planner_case,
     load_jsonl_cases,
     summarize_eval_results,
+    validate_planner_case_dataset,
 )
 
 try:
@@ -25,13 +26,23 @@ def main() -> None:
         choices=["planner", "evaluator", "all"],
         default="all",
     )
-    parser.add_argument("--planner-cases", default="evals/agent_planner_cases.jsonl")
+    parser.add_argument("--planner-cases", default="evals/agent_planner_cases_200.jsonl")
     parser.add_argument("--evaluator-cases", default="evals/agent_evaluator_cases.jsonl")
     parser.add_argument("--event-index", default="outputs/labeled_event_index.parquet")
     parser.add_argument("--scenario-index", default="outputs/scenario_index.parquet")
     parser.add_argument("--scenario-root", default="data/val")
     parser.add_argument("--model-config", default="config/model.yml")
     parser.add_argument("--use-heuristic-planner", action="store_true")
+    parser.add_argument(
+        "--planner-prompt-profile",
+        choices=["full", "schema_only", "names_only"],
+        default="full",
+    )
+    parser.add_argument("--planner-max-attempts", type=int, default=2)
+    parser.add_argument(
+        "--splits",
+        help="Comma-separated planner splits: development,regression,heldout,adversarial,safety.",
+    )
     parser.add_argument("--max-cases", type=int)
     parser.add_argument(
         "--case-ids",
@@ -51,11 +62,16 @@ def main() -> None:
             registry=registry,
             config_path=args.model_config,
             use_heuristic_planner=args.use_heuristic_planner,
+            planner_prompt_profile=args.planner_prompt_profile,
+            planner_max_attempts=args.planner_max_attempts,
         )
+        planner_cases = load_jsonl_cases(args.planner_cases)
+        validate_planner_case_dataset(planner_cases)
         cases = _selected_cases(
-            load_jsonl_cases(args.planner_cases),
+            planner_cases,
             args.case_ids,
             args.max_cases,
+            args.splits,
         )
         for case in cases:
             try:
@@ -68,6 +84,8 @@ def main() -> None:
                     passed=False,
                     checks={"planner_execution": False},
                     details={"question": case.get("question"), "error": str(error)},
+                    split=str(case.get("split") or "unspecified"),
+                    difficulty=str(case.get("difficulty") or "unspecified"),
                 )
             all_results.append(result)
 
@@ -76,6 +94,7 @@ def main() -> None:
             load_jsonl_cases(args.evaluator_cases),
             args.case_ids,
             args.max_cases,
+            None,
         )
         all_results.extend(evaluate_evaluator_case(case) for case in cases)
 
@@ -97,7 +116,11 @@ def _selected_cases(
     cases: list[dict],
     case_ids: str | None,
     max_cases: int | None,
+    splits: str | None = None,
 ) -> list[dict]:
+    if splits:
+        selected_splits = {value.strip() for value in splits.split(",") if value.strip()}
+        cases = [case for case in cases if str(case.get("split")) in selected_splits]
     if case_ids:
         selected = {value.strip() for value in case_ids.split(",") if value.strip()}
         cases = [case for case in cases if str(case.get("id")) in selected]

@@ -20,5 +20,9 @@ build/
 /outputs/
 /scripts/outputs/
 
+# Local document QA and resume export
+.codex-tmp/
+docs/DriveScene_Agent_简历项目经历.docx
+
 .DS_Store
 Thumbs.db

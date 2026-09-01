@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 
@@ -8,7 +9,9 @@ from drivescene.eval.agent_eval import (
     evaluate_planner_case,
     load_jsonl_cases,
     summarize_eval_results,
+    validate_planner_case_dataset,
 )
+from scripts.build_planner_eval_dataset import SPLIT_CATEGORY_COUNTS, build_cases
 
 
 def _registry():
@@ -95,4 +98,43 @@ def test_evaluator_case_and_summary_report_failure() -> None:
     assert summary["total"] == 2
     assert summary["passed"] == 1
     assert summary["pass_rate"] == 0.5
+    assert summary["pass_rate_ci95"][0] < 0.5 < summary["pass_rate_ci95"][1]
     assert summary["failed_case_ids"] == ["eval-2"]
+
+
+def test_stratified_planner_dataset_contains_200_valid_cases() -> None:
+    cases = build_cases()
+
+    validate_planner_case_dataset(cases, expected_total=200)
+
+    assert len(cases) == 200
+    assert {
+        split: sum(case["split"] == split for case in cases)
+        for split in SPLIT_CATEGORY_COUNTS
+    } == {
+        split: sum(categories.values())
+        for split, categories in SPLIT_CATEGORY_COUNTS.items()
+    }
+    assert len({case["question"] for case in cases}) == 200
+
+
+def test_committed_planner_dataset_matches_manifest_hash() -> None:
+    dataset = Path("evals/agent_planner_cases_200.jsonl")
+    manifest = json.loads(
+        Path("evals/agent_planner_cases_200.manifest.json").read_text(encoding="utf-8")
+    )
+
+    assert len(load_jsonl_cases(dataset)) == 200
+    assert hashlib.sha256(dataset.read_bytes()).hexdigest() == manifest["sha256"]
+
+
+def test_dataset_validation_rejects_template_family_leakage() -> None:
+    cases = build_cases()[:2]
+    cases[1] = {**cases[1], "split": "heldout", "template_family": cases[0]["template_family"]}
+
+    try:
+        validate_planner_case_dataset(cases)
+    except ValueError as error:
+        assert "Template-family leakage" in str(error)
+    else:
+        raise AssertionError("cross-split template leakage must fail")

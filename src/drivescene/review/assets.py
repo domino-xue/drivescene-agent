@@ -511,13 +511,11 @@ def _draw_role_label(ax: plt.Axes, row: pd.Series, event: dict[str, Any]) -> Non
     focal_id = str(event["track_id"])
     actor_id = str(event.get("actor_id", ""))
     subject_id = event_subject_track_id(event)
-    if track_id == subject_id:
-        role = "subject"
-    elif track_id == focal_id:
-        role = "focal"
-    elif actor_id and track_id == actor_id:
-        role = "primary"
-    else:
+    if not (
+        track_id == subject_id
+        or track_id == focal_id
+        or (actor_id and track_id == actor_id)
+    ):
         return
     ax.text(
         float(row["position_x"]) + 1.2,

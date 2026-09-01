@@ -19,5 +19,9 @@ jobs:
         run: python -m ruff check src scripts tests
       - name: Test
         run: python -m pytest -q
+      - name: Validate generated planner benchmark
+        run: python scripts/build_planner_eval_dataset.py && git diff --exit-code -- evals/agent_planner_cases_200.jsonl evals/agent_planner_cases_200.manifest.json
+      - name: Runtime ablation smoke test
+        run: python scripts/run_runtime_ablation.py --output runtime-ablation.json
       - name: Offline demo smoke test
         run: python scripts/run_demo.py --json > demo-result.json
