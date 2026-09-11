@@ -1,6 +1,8 @@
-# DriveScene Agent Tools
+# DriveScene Agent 工具契约
 
 本文档说明当前暴露给 LLM/Agent 的工具接口。重构后，Agent 只看到 4 个通用参数化工具；急刹、近距离跟车、文件操作和表格操作都通过 `operation`、`event_type`、`filters` 等参数表达，避免为同类任务不断增加新工具名。
+
+项目概览见 [中文 README](../README.md)，运行时职责和数据流见 [架构说明](architecture.md)，指标口径见 [评测说明](agent_evaluation.md)。
 
 工具描述采用英文主说明加中文备注，结构包含 `Input`、`Output`、`When to use`、`Do not use when` 和 examples。中文备注只用于帮助中文请求映射参数，不作为唯一语义来源。
 
