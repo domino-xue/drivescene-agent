@@ -65,13 +65,13 @@ CLI 输出包括：
 python -m streamlit run scripts/demo_app.py
 ```
 
-页面展示聊天消息、计划表、事件指标和执行摘要，适合面试时快速说明 Agent 的主执行链路。
+页面展示聊天消息、计划表、事件指标和执行摘要，可用于快速检查 Agent 的主执行链路。
 
 ![最小离线 Demo](../docs/assets/drivescene-demo.png)
 
-## 推荐面试演示话术
+## 实现说明
 
-> 这个 Demo 没有调用模型，但走的是正式 Plan-and-Execute Runtime。这里用确定性 Planner 替代在线 LLM，是为了让任何人克隆仓库后都能复现执行、状态和完成度判断链路。正式 Agent 只替换 Planner，不会绕过 Tool Registry、Executor 或安全策略。
+该 Demo 没有调用模型，但使用正式的 Plan-and-Execute Runtime。确定性 Planner 只替代在线 LLM 规划步骤，使运行结果不受模型服务和网络状态影响；Tool Registry、Executor、状态传递、完成度判断与安全策略均沿用正式实现。
 
 ## Demo 的边界
 
@@ -80,4 +80,4 @@ python -m streamlit run scripts/demo_app.py
 - 86.7% Planner 指标来自独立的 120 条模型主评测，不来自该三条 Demo 数据。
 - 删除、覆盖和完整多步骤工作流应在正式 CLI/UI 中演示，不在最小 Demo 中执行真实文件副作用。
 
-返回 [项目首页](../README.md)，或查看 [完整面试讲解](../docs/interview_guide.md)。
+返回[项目首页](../README.md)，或查看[系统架构](../docs/architecture.md)与[评测报告](../docs/agent_evaluation.md)。
