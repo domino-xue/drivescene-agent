@@ -6,9 +6,11 @@ DriveScene Agent 是一个面向自动驾驶轨迹数据分析的 **Plan-and-Exe
 
 | 分层评测任务 | 主评测 whole-case pass | 自动化测试 |
 | ---: | ---: | ---: |
-| 200 条 | 86.7%（104/120） | 252 个 |
+| 200 条 | 86.7%（104/120） | 254 个 |
 
-![DriveScene Agent 离线演示](docs/assets/drivescene-demo.png)
+![DriveScene Agent 实际运行录制](docs/assets/drivescene-runtime-demo.gif)
+
+> 动图由仓库中的实际 Demo Runtime 运行生成，展示结构化计划、工具结果与完成度判断。在线模式复用同一执行链路，并将 Planner 与 Reporter 切换为真实模型调用。
 
 ## 核心能力
 
@@ -19,9 +21,9 @@ DriveScene Agent 是一个面向自动驾驶轨迹数据分析的 **Plan-and-Exe
 - 对删除、覆盖和原地修改等高风险操作要求人工确认。
 - 提供无需模型密钥和完整数据集的离线演示。
 
-## 快速开始
+## 快速开始：调用真实模型
 
-离线演示使用真实的 Plan-and-Execute 运行时与三条内置事件索引，不调用外部模型，也不需要下载 Argoverse 2 数据。
+推荐先使用 API Key 运行在线 Demo。它使用三条内置事件索引，因此不需要下载 Argoverse 2 数据；Planner 和 Reporter 会真实调用 `config/model.yml` 中配置的模型，其余计划校验、工具执行、状态绑定和完成度判断均使用正式 Runtime。
 
 ```bash
 git clone https://github.com/domino-xue/drivescene-agent.git
@@ -34,7 +36,9 @@ Windows PowerShell：
 ```powershell
 .\.venv\Scripts\Activate.ps1
 python -m pip install -e ".[dev]"
-python scripts/run_demo.py --question "找 2 个有效急刹案例"
+Copy-Item config/model.example.yml config/model.yml
+$env:OPENAI_API_KEY = "<your-api-key>"
+python scripts/run_demo.py --online --question "找 2 个有效急刹案例并给出动画路径"
 python -m streamlit run scripts/demo_app.py
 ```
 
@@ -43,11 +47,23 @@ macOS / Linux：
 ```bash
 source .venv/bin/activate
 python -m pip install -e ".[dev]"
-python scripts/run_demo.py --question "找 2 个有效急刹案例"
+cp config/model.example.yml config/model.yml
+export OPENAI_API_KEY="<your-api-key>"
+python scripts/run_demo.py --online --question "找 2 个有效急刹案例并给出动画路径"
 python -m streamlit run scripts/demo_app.py
 ```
 
-CLI 会依次输出计划、工具执行结果、完成度判断和最终回答；Streamlit 页面展示相同的执行链路。其他运行方式见[离线演示说明](demo/README.md)。
+示例配置默认使用 DeepSeek 的 OpenAI-compatible API。若使用其他兼容服务，只需修改 `model` 与 `base_url`；环境变量名继续使用 `OPENAI_API_KEY`。Streamlit 检测到密钥后默认启用在线 LLM Planner，也可以在侧栏切换运行模式。
+
+CLI 会依次输出实际模型生成的计划、确定性工具结果、完成度判断和模型汇报。完整参数见[演示说明](demo/README.md)。
+
+### 无 API Key 的离线回退
+
+离线模式使用相同 Runtime 和内置事件索引，仅将 Planner 替换为确定性实现，适合检查安装、工具和 UI：
+
+```bash
+python scripts/run_demo.py --question "找 2 个有效急刹案例"
+```
 
 ## 系统架构
 

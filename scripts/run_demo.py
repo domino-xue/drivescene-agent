@@ -7,8 +7,10 @@ import tempfile
 from typing import Any
 
 import pandas as pd
+from langchain_openai import ChatOpenAI
 
-from drivescene.agent.plan_execute import HeuristicPlanner, PlanAndExecuteAgent
+from drivescene.agent.model_config import load_model_config
+from drivescene.agent.plan_execute import HeuristicPlanner, LLMJsonPlanner, PlanAndExecuteAgent
 from drivescene.agent.reporting import LLMReporter
 from drivescene.agent.tool_registry import build_tool_registry
 from drivescene.analysis.tools import AnalysisTools
@@ -20,7 +22,11 @@ from drivescene.ops.tables import TableOps
 _DEMO_ROOT: Path | None = None
 
 
-def build_demo_agent() -> tuple[PlanAndExecuteAgent, Path]:
+def build_demo_agent(
+    *,
+    online: bool = False,
+    model_config: Path | str = "config/model.yml",
+) -> tuple[PlanAndExecuteAgent, Path, str]:
     global _DEMO_ROOT
     if _DEMO_ROOT is None:
         _DEMO_ROOT = Path(tempfile.mkdtemp(prefix="drivescene-demo-"))
@@ -34,22 +40,47 @@ def build_demo_agent() -> tuple[PlanAndExecuteAgent, Path]:
         artifact_ops=ArtifactOps(),
         table_ops=TableOps(),
     )
+    planner = HeuristicPlanner()
+    reporter = LLMReporter()
+    runtime_mode = "offline · deterministic planner"
+    if online:
+        config = load_model_config(model_config)
+        if not config.api_key:
+            raise RuntimeError(
+                "Online demo requires OPENAI_API_KEY. Set it in the current shell, "
+                "then rerun with --online."
+            )
+        model = ChatOpenAI(**config.to_chat_openai_kwargs())
+        planner = LLMJsonPlanner(model, registry)
+        reporter = LLMReporter(model=model)
+        runtime_mode = f"online · {config.model}"
+
     return (
         PlanAndExecuteAgent(
             registry=registry,
-            planner=HeuristicPlanner(),
-            reporter=LLMReporter(),
+            planner=planner,
+            reporter=reporter,
             max_replans=1,
         ),
         _DEMO_ROOT,
+        runtime_mode,
     )
 
 
-def run_demo(question: str) -> dict[str, Any]:
-    agent, root = build_demo_agent()
+def run_demo(
+    question: str,
+    *,
+    online: bool = False,
+    model_config: Path | str = "config/model.yml",
+) -> dict[str, Any]:
+    agent, root, runtime_mode = build_demo_agent(
+        online=online,
+        model_config=model_config,
+    )
     state = agent.run(question)
     return {
         "question": question,
+        "runtime_mode": runtime_mode,
         "root": str(root),
         "final_answer": state.final_answer,
         "plan": [
@@ -67,15 +98,31 @@ def run_demo(question: str) -> dict[str, Any]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run DriveScene Agent without API key or AV2 data.")
+    parser = argparse.ArgumentParser(
+        description="Run DriveScene Agent with built-in sample indexes and no AV2 download."
+    )
     parser.add_argument("--question", default="汇总当前事件索引")
+    parser.add_argument(
+        "--online",
+        action="store_true",
+        help="Use the configured LLM for planning and reporting; requires OPENAI_API_KEY.",
+    )
+    parser.add_argument("--model-config", default="config/model.yml")
     parser.add_argument("--json", action="store_true", help="Print the complete structured result.")
     args = parser.parse_args()
-    result = run_demo(args.question)
+    try:
+        result = run_demo(
+            args.question,
+            online=args.online,
+            model_config=args.model_config,
+        )
+    except RuntimeError as exc:
+        parser.error(str(exc))
     if args.json:
         print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
         return
     print("[DriveScene Demo]")
+    print(f"runtime: {result['runtime_mode']}")
     print(f"question: {result['question']}")
     for step in result["plan"]:
         print(f"[{step['status']}] {step['step_id']}: {step['goal']} -> {step['tool_name']}")

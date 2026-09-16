@@ -1,8 +1,8 @@
 model:
-  model: deepseek-v4-flash
+  model: deepseek-flash
   base_url: https://api.deepseek.com
   temperature: 0
-  reasoning_effort: xhigh
+  reasoning_effort: high
   store: false
   use_responses_api: true
 
