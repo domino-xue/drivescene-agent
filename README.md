@@ -8,9 +8,19 @@ DriveScene Agent 是一个面向自动驾驶轨迹数据分析的 **Plan-and-Exe
 | ---: | ---: | ---: |
 | 200 条 | 86.7%（104/120） | 254 个 |
 
-![DriveScene Agent 实际运行录制](docs/assets/drivescene-runtime-demo.gif)
+## 真实数据演示
 
-> 动图由仓库中的实际 Demo Runtime 运行生成，展示结构化计划、工具结果与完成度判断。在线模式复用同一执行链路，并将 Planner 与 Reporter 切换为真实模型调用。
+2026-09-16 使用 DeepSeek `deepseek-flash` 在线运行正式 Agent：场景索引覆盖本地 **24,988 个 AV2 场景、71,696,443 行轨迹记录**，同时检索已有的 **169 条真实事件记录**。本次会话成功查询 3 个 Austin 场景并返回 5 个有效急刹案例的证据路径。
+
+![DeepSeek 在线调用与真实数据查询录屏](docs/assets/drivescene-real-data.gif)
+
+录屏节选自一次真实会话，等待时间已压缩。这次运行最终为**部分完成**：否定指令触发多余导出重规划，复制参数类型校验失败；摘要显示的 290 条是重复累计错误，真实事件数为 169。原始回答、工具输出、API 用量和问题分析见[真实运行记录](docs/real_data_demo.md)，未将本次演示计入 86.7% Planner 评测。
+
+下面是该会话实际返回的 `000097` 急刹案例轨迹动画；动画清单中的事件标识已与查询结果核对。
+
+![真实急刹案例 000097：轨迹与运动学证据](docs/assets/real-hard-braking-000097.gif)
+
+全量场景索引覆盖不等于全量事件挖掘：当前 169 条事件来自 123 个场景，未对全部 24,988 个场景重新检测并人工复核。
 
 ## 核心能力
 
@@ -53,7 +63,7 @@ python scripts/run_demo.py --online --question "找 2 个有效急刹案例并�
 python -m streamlit run scripts/demo_app.py
 ```
 
-示例配置默认使用 DeepSeek 的 OpenAI-compatible API。若使用其他兼容服务，只需修改 `model` 与 `base_url`；环境变量名继续使用 `OPENAI_API_KEY`。Streamlit 检测到密钥后默认启用在线 LLM Planner，也可以在侧栏切换运行模式。
+示例配置默认使用 DeepSeek 的 OpenAI-compatible API。若使用其他兼容服务，需要核对 `model`、`base_url`、协议选项及推理参数；环境变量名继续使用 `OPENAI_API_KEY`。已有 DeepSeek `ANTHROPIC_AUTH_TOKEN` 的 PowerShell 用户可在当前终端执行 `$env:OPENAI_API_KEY = $env:ANTHROPIC_AUTH_TOKEN`，项目配置中的 `base_url` 使用 `https://api.deepseek.com`。Streamlit 检测到密钥后默认启用在线 LLM Planner，也可以在侧栏切换运行模式。
 
 CLI 会依次输出实际模型生成的计划、确定性工具结果、完成度判断和模型汇报。完整参数见[演示说明](demo/README.md)。
 
@@ -202,7 +212,7 @@ python scripts/build_planner_eval_dataset.py
 python scripts/run_planner_ablation.py
 ```
 
-复现实验前请阅读[评测报告](docs/agent_evaluation.md#复现方式)，确认模型配置、数据集哈希和运行参数一致。
+复现实验前请阅读[评测报告](docs/agent_evaluation.md#planner-复现命令)，确认模型配置、数据集哈希和运行参数一致。
 
 ## 代码导航
 
